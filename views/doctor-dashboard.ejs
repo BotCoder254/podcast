@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Dashboard - MedCare</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+</head>
+<body class="bg-gray-50">
+    <!-- Professional Navigation -->
+    <nav class="bg-white shadow-lg fixed w-full top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center space-x-2">
+                        <i class="fas fa-heartbeat text-blue-600 text-2xl"></i>
+                        <span class="text-2xl font-bold text-blue-600">MedCare</span>
+                    </a>
+                </div>
+                <div class="flex items-center space-x-6">
+                    <a href="/dashboard" class="flex items-center space-x-1 px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-150">
+                        <i class="fas fa-columns"></i>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="/appointments" class="flex items-center space-x-1 px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-150">
+                        <i class="fas fa-calendar-alt"></i>
+                        <span>Schedule</span>
+                    </a>
+                    <a href="/patients" class="flex items-center space-x-1 px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-150">
+                        <i class="fas fa-users"></i>
+                        <span>Patients</span>
+                    </a>
+                    <a href="/profile" class="flex items-center space-x-1 px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-150">
+                        <i class="fas fa-user-md"></i>
+                        <span>Profile</span>
+                    </a>
+                    <div class="relative">
+                        <button id="notifications-menu" class="flex items-center space-x-1 px-3 py-2 rounded-md text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition duration-150">
+                            <i class="fas fa-bell"></i>
+                            <span>Notifications</span>
+                            <span id="notification-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">0</span>
+                        </button>
+                    </div>
+                    <a href="/auth/logout" class="flex items-center space-x-1 px-3 py-2 rounded-md text-red-600 hover:bg-red-50 hover:text-red-700 transition duration-150">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="mt-20 p-8">
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition duration-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-blue-100">Total Appointments</p>
+                        <h3 class="text-3xl font-bold" id="appointment-count">0</h3>
+                    </div>
+                    <div class="text-4xl text-blue-100">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition duration-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-100">Total Patients</p>
+                        <h3 class="text-3xl font-bold" id="patient-count">0</h3>
+                    </div>
+                    <div class="text-4xl text-green-100">
+                        <i class="fas fa-users"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition duration-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-yellow-100">Rating</p>
+                        <div class="flex items-center">
+                            <h3 class="text-3xl font-bold mr-2" id="average-rating">0.0</h3>
+                            <div class="text-2xl text-yellow-100">
+                                <i class="fas fa-star"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-4xl text-yellow-100">
+                        <i class="fas fa-star"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white transform hover:scale-105 transition duration-200">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-purple-100">Today's Schedule</p>
+                        <h3 class="text-3xl font-bold" id="today-appointments">0</h3>
+                    </div>
+                    <div class="text-4xl text-purple-100">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6 transform hover:scale-105 transition duration-200">
+                <button class="w-full flex items-center justify-between text-blue-600 hover:text-blue-700">
+                    <span class="flex items-center">
+                        <i class="fas fa-calendar-plus text-2xl mr-3"></i>
+                        <span class="text-lg font-semibold">Set Schedule</span>
+                    </span>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg p-6 transform hover:scale-105 transition duration-200">
+                <button class="w-full flex items-center justify-between text-green-600 hover:text-green-700">
+                    <span class="flex items-center">
+                        <i class="fas fa-notes-medical text-2xl mr-3"></i>
+                        <span class="text-lg font-semibold">Add Prescription</span>
+                    </span>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg p-6 transform hover:scale-105 transition duration-200">
+                <button class="w-full flex items-center justify-between text-yellow-600 hover:text-yellow-700">
+                    <span class="flex items-center">
+                        <i class="fas fa-file-medical text-2xl mr-3"></i>
+                        <span class="text-lg font-semibold">Medical Records</span>
+                    </span>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="bg-white rounded-xl shadow-lg p-6 transform hover:scale-105 transition duration-200">
+                <button class="w-full flex items-center justify-between text-purple-600 hover:text-purple-700">
+                    <span class="flex items-center">
+                        <i class="fas fa-comments text-2xl mr-3"></i>
+                        <span class="text-lg font-semibold">Messages</span>
+                    </span>
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Appointments and Schedule Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <!-- Today's Appointments -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold text-gray-800">Today's Appointments</h2>
+                        <div class="flex items-center space-x-2">
+                            <button class="text-gray-600 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100 transition duration-150">
+                                <i class="fas fa-filter"></i>
+                            </button>
+                            <button class="text-blue-600 hover:text-blue-700 p-2 rounded-full hover:bg-blue-50 transition duration-150">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="space-y-4" id="appointments-container">
+                        <!-- Appointment cards will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schedule -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">Weekly Schedule</h2>
+                    <button onclick="openAvailabilityModal()" class="text-blue-600 hover:text-blue-700 p-2 rounded-full hover:bg-blue-50 transition duration-150">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                <div class="space-y-3">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-700 mb-2">Monday</h3>
+                        <div id="schedule-monday" class="space-y-2"></div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-700 mb-2">Tuesday</h3>
+                        <div id="schedule-tuesday" class="space-y-2"></div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-700 mb-2">Wednesday</h3>
+                        <div id="schedule-wednesday" class="space-y-2"></div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-700 mb-2">Thursday</h3>
+                        <div id="schedule-thursday" class="space-y-2"></div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-700 mb-2">Friday</h3>
+                        <div id="schedule-friday" class="space-y-2"></div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-700 mb-2">Saturday</h3>
+                        <div id="schedule-saturday" class="space-y-2"></div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h3 class="font-semibold text-gray-700 mb-2">Sunday</h3>
+                        <div id="schedule-sunday" class="space-y-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Patient List and Reviews -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Patient List -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-xl font-bold text-gray-800">Recent Patients</h2>
+                        <div class="flex items-center space-x-2">
+                            <div class="relative">
+                                <input type="text" placeholder="Search patients..." class="w-64 px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                    <i class="fas fa-search text-gray-400"></i>
+                                </div>
+                            </div>
+                            <button class="text-gray-600 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100 transition duration-150">
+                                <i class="fas fa-filter"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="patient-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Patient cards will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reviews -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold text-gray-800">Recent Reviews</h2>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-2xl font-bold text-gray-800" id="average-rating">4.5</span>
+                        <div class="text-yellow-400 text-xl" id="rating-stars"></div>
+                    </div>
+                </div>
+                <div id="reviews-list" class="space-y-4">
+                    <!-- Reviews will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Availability Modal -->
+    <div id="availability-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="relative top-20 mx-auto p-6 border w-96 shadow-lg rounded-xl bg-white">
+            <div class="absolute top-4 right-4">
+                <button onclick="closeAvailabilityModal()" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <h3 class="text-xl font-bold text-gray-800 mb-6">Set Availability</h3>
+            <form id="availability-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Day</label>
+                    <div class="relative">
+                        <select name="day" class="appearance-none block w-full px-4 py-3 rounded-lg border border-gray-300 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="monday">Monday</option>
+                            <option value="tuesday">Tuesday</option>
+                            <option value="wednesday">Wednesday</option>
+                            <option value="thursday">Thursday</option>
+                            <option value="friday">Friday</option>
+                            <option value="saturday">Saturday</option>
+                            <option value="sunday">Sunday</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <div class="relative">
+                        <input type="time" name="startTime" class="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <div class="relative">
+                        <input type="time" name="endTime" class="block w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-4 mt-6">
+                    <button type="button" onclick="closeAvailabilityModal()" 
+                            class="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition duration-150">
+                        Cancel
+                    </button>
+                    <button type="submit" 
+                            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition duration-150">
+                        Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/doctor-dashboard.js"></script>
+</body>
+</html> 

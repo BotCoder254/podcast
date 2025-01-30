@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedCare - Doctor Appointment System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-50">
+    <!-- Modern Navigation -->
+    <nav class="bg-white shadow-lg fixed w-full top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <a href="/" class="flex items-center space-x-2">
+                        <i class="fas fa-heartbeat text-blue-600 text-2xl"></i>
+                        <span class="text-2xl font-bold text-blue-600">MedCare</span>
+                    </a>
+                </div>
+                <div class="hidden md:flex items-center space-x-8">
+                    <a href="/" class="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-home"></i>
+                        <span>Home</span>
+                    </a>
+                    <a href="/services" class="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-stethoscope"></i>
+                        <span>Services</span>
+                    </a>
+                    <a href="/doctors" class="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
+                        <i class="fas fa-user-md"></i>
+                        <span>Doctors</span>
+                    </a>
+                    <% if (!isAuthenticated) { %>
+                        <a href="/login" class="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
+                            <i class="fas fa-sign-in-alt"></i>
+                            <span>Login</span>
+                        </a>
+                        <a href="/register" class="flex items-center space-x-1 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                            <i class="fas fa-user-plus"></i>
+                            <span>Register</span>
+                        </a>
+                    <% } else { %>
+                        <a href="/dashboard" class="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
+                            <i class="fas fa-columns"></i>
+                            <span>Dashboard</span>
+                        </a>
+                        <a href="/auth/logout" class="flex items-center space-x-1 text-red-600 hover:text-red-700">
+                            <i class="fas fa-sign-out-alt"></i>
+                            <span>Logout</span>
+                        </a>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content with mt-16 to account for fixed navbar -->
+    <div class="mt-16">
+        <!-- Hero Section -->
+        <div class="relative bg-gradient-to-r from-blue-600 to-blue-800 h-[500px]">
+            <div class="absolute inset-0">
+                <img src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1950&q=80" 
+                     class="w-full h-full object-cover opacity-20" alt="Medical Background">
+            </div>
+            <div class="relative max-w-7xl mx-auto px-4 py-24">
+                <div class="text-center">
+                    <h1 class="text-4xl md:text-6xl font-bold text-white mb-6">
+                        Your Health, Our Priority
+                    </h1>
+                    <p class="text-xl text-gray-200 mb-8">
+                        Book appointments with the best doctors in your area
+                    </p>
+                    <a href="/book-appointment" 
+                       class="inline-flex items-center space-x-2 bg-white text-blue-600 px-8 py-3 rounded-full text-lg font-semibold hover:bg-gray-100 transition duration-300">
+                        <i class="fas fa-calendar-plus"></i>
+                        <span>Book Appointment Now</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Services Section -->
+        <div class="py-16 bg-white">
+            <div class="max-w-7xl mx-auto px-4">
+                <h2 class="text-3xl font-bold text-center mb-12">Our Services</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Service Cards -->
+                    <div class="bg-white rounded-xl shadow-lg p-8 transform hover:scale-105 transition duration-300">
+                        <div class="text-blue-600 text-4xl mb-4">
+                            <i class="fas fa-user-md"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2">Expert Doctors</h3>
+                        <p class="text-gray-600">Access to highly qualified and experienced medical professionals.</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-8 transform hover:scale-105 transition duration-300">
+                        <div class="text-blue-600 text-4xl mb-4">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2">Easy Scheduling</h3>
+                        <p class="text-gray-600">Book appointments online at your convenience.</p>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-8 transform hover:scale-105 transition duration-300">
+                        <div class="text-blue-600 text-4xl mb-4">
+                            <i class="fas fa-heartbeat"></i>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-2">Quality Care</h3>
+                        <p class="text-gray-600">Comprehensive healthcare services for you and your family.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Testimonials Section -->
+        <div class="py-16 bg-gray-50">
+            <div class="max-w-7xl mx-auto px-4">
+                <h2 class="text-3xl font-bold text-center mb-12">What Our Patients Say</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <!-- Testimonial Cards -->
+                    <div class="bg-white rounded-xl shadow-lg p-6 transform hover:scale-105 transition duration-300">
+                        <div class="flex items-center mb-4">
+                            <div class="text-yellow-400 text-xl">
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                                <i class="fas fa-star"></i>
+                            </div>
+                        </div>
+                        <p class="text-gray-600 mb-4">"Excellent service and very professional doctors. Highly recommended!"</p>
+                        <div class="flex items-center">
+                            <img src="/images/avatar1.jpg" alt="Patient" class="w-10 h-10 rounded-full mr-3">
+                            <div>
+                                <p class="font-semibold">John Doe</p>
+                                <p class="text-sm text-gray-500">Patient</p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Add more testimonial cards as needed -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <% if (!isAuthenticated) { %>
+    <footer class="bg-gray-800 text-white mt-16">
+        <div class="max-w-7xl mx-auto px-4 py-12">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <i class="fas fa-heartbeat text-blue-400 text-2xl"></i>
+                        <h3 class="text-xl font-bold">MedCare</h3>
+                    </div>
+                    <p class="text-gray-400">Your trusted healthcare partner</p>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Quick Links</h4>
+                    <ul class="space-y-2">
+                        <li><a href="/" class="text-gray-400 hover:text-white flex items-center space-x-2">
+                            <i class="fas fa-chevron-right text-sm"></i>
+                            <span>Home</span>
+                        </a></li>
+                        <li><a href="/services" class="text-gray-400 hover:text-white flex items-center space-x-2">
+                            <i class="fas fa-chevron-right text-sm"></i>
+                            <span>Services</span>
+                        </a></li>
+                        <li><a href="/doctors" class="text-gray-400 hover:text-white flex items-center space-x-2">
+                            <i class="fas fa-chevron-right text-sm"></i>
+                            <span>Doctors</span>
+                        </a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Contact</h4>
+                    <ul class="space-y-2 text-gray-400">
+                        <li class="flex items-center space-x-2">
+                            <i class="fas fa-envelope"></i>
+                            <span>info@medcare.com</span>
+                        </li>
+                        <li class="flex items-center space-x-2">
+                            <i class="fas fa-phone"></i>
+                            <span>(123) 456-7890</span>
+                        </li>
+                        <li class="flex items-center space-x-2">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <span>123 Medical Center Dr.</span>
+                        </li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-lg font-semibold mb-4">Follow Us</h4>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white text-xl">
+                            <i class="fab fa-facebook"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white text-xl">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white text-xl">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <% } %>
+</body>
+</html> 
