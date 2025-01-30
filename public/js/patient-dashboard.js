@@ -1,6 +1,22 @@
+import SocketService from './socket-service.js';
+import NotificationService from './notification-service.js';
+import { 
+    AppointmentStatus, 
+    generateAppointmentCard, 
+    generateTimeSlots, 
+    isTimeSlotAvailable 
+} from './appointment-utils.js';
+
 // Initialize date picker
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize date picker for appointment booking
+    initializeDatePicker();
+    loadDashboardData();
+    setupEventListeners();
+    initializeRealTimeUpdates();
+});
+
+// Initialize Flatpickr date picker
+function initializeDatePicker() {
     const appointmentDate = document.querySelector('#appointment-date');
     if (appointmentDate) {
         flatpickr(appointmentDate, {
@@ -11,17 +27,22 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+}
 
-    // Load initial data
-    loadAppointments();
-    loadProfile();
-
-    // Set up event listeners
-    setupEventListeners();
-
-    // Start notification polling
-    startNotificationPolling();
-});
+// Load all dashboard data
+async function loadDashboardData() {
+    try {
+        await Promise.all([
+            loadAppointments(),
+            loadProfile(),
+            loadMedicalHistory()
+        ]);
+        updateDashboardStats();
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        NotificationService.error('Error loading dashboard data');
+    }
+}
 
 // Load user's appointments
 async function loadAppointments() {
@@ -29,44 +50,27 @@ async function loadAppointments() {
         const response = await fetch('/appointments/my-appointments');
         const appointments = await response.json();
         
-        const appointmentsTable = document.querySelector('#appointments-table tbody');
-        if (!appointmentsTable) return;
+        const appointmentsContainer = document.querySelector('#appointments-container');
+        if (!appointmentsContainer) return;
 
-        appointmentsTable.innerHTML = appointments.map(appointment => `
-            <tr>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="flex items-center">
-                        <div class="flex-shrink-0 h-10 w-10">
-                            <img class="h-10 w-10 rounded-full" 
-                                 src="${appointment.doctor.profileImage || '/images/default-avatar.png'}" 
-                                 alt="${appointment.doctor.name}">
-                        </div>
-                        <div class="ml-4">
-                            <div class="text-sm font-medium text-gray-900">${appointment.doctor.name}</div>
-                            <div class="text-sm text-gray-500">${appointment.doctor.specialization}</div>
-                        </div>
-                    </div>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="text-sm text-gray-900">${new Date(appointment.date).toLocaleDateString()}</span>
-                    <span class="text-sm text-gray-500">${appointment.time}</span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(appointment.status)}">
-                        ${appointment.status}
-                    </span>
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    ${appointment.symptoms}
-                </td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    ${getAppointmentActions(appointment)}
-                </td>
-            </tr>
-        `).join('');
+        if (appointments.length === 0) {
+            appointmentsContainer.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-calendar-times text-4xl mb-4"></i>
+                    <p>No appointments scheduled</p>
+                </div>
+            `;
+            return;
+        }
+
+        appointmentsContainer.innerHTML = appointments
+            .map(appointment => generateAppointmentCard(appointment))
+            .join('');
+
+        updateDashboardStats(appointments);
     } catch (error) {
         console.error('Error loading appointments:', error);
-        showNotification('Error loading appointments', 'error');
+        NotificationService.error('Error loading appointments');
     }
 }
 
@@ -84,45 +88,62 @@ async function loadDoctors() {
         const doctorList = document.querySelector('#doctor-list');
         if (!doctorList) return;
 
+        if (doctors.length === 0) {
+            doctorList.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-user-md text-4xl mb-4"></i>
+                    <p>No doctors available for selected criteria</p>
+                </div>
+            `;
+            return;
+        }
+
         doctorList.innerHTML = doctors.map(doctor => `
-            <div class="flex items-center justify-between p-4 border-b">
-                <div class="flex items-center">
-                    <img class="h-12 w-12 rounded-full" 
-                         src="${doctor.profileImage || '/images/default-avatar.png'}" 
-                         alt="${doctor.name}">
-                    <div class="ml-4">
-                        <div class="text-sm font-medium text-gray-900">${doctor.name}</div>
-                        <div class="text-sm text-gray-500">${doctor.specialization}</div>
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 transform transition duration-200 hover:shadow-md">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <img src="${doctor.profileImage || '/images/default-avatar.png'}" 
+                             alt="${doctor.name}" 
+                             class="w-12 h-12 rounded-full object-cover">
+                        <div class="ml-4">
+                            <h3 class="font-semibold text-gray-800">${doctor.name}</h3>
+                            <p class="text-sm text-gray-500">${doctor.specialization}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="flex items-center text-yellow-400 mb-1">
+                            ${generateStarRating(doctor.rating)}
+                        </div>
+                        <p class="text-sm text-gray-500">${doctor.totalReviews} reviews</p>
                     </div>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <select class="time-slot form-select rounded-md border-gray-300" 
-                            data-doctor-id="${doctor._id}">
-                        ${generateTimeSlots(doctor.bookedSlots)}
-                    </select>
-                    <button onclick="bookAppointment('${doctor._id}')"
-                            class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
-                        Book
-                    </button>
+                <div class="mt-4">
+                    <div class="grid grid-cols-3 gap-2">
+                        ${generateTimeSlots(doctor.availability.startTime, doctor.availability.endTime)
+                            .map(slot => `
+                                <button onclick="bookAppointment('${doctor._id}', '${slot.time}')"
+                                        class="px-3 py-2 text-sm text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition duration-150">
+                                    ${slot.formatted}
+                                </button>
+                            `).join('')}
+                    </div>
                 </div>
             </div>
         `).join('');
     } catch (error) {
         console.error('Error loading doctors:', error);
-        showNotification('Error loading doctors', 'error');
+        NotificationService.error('Error loading doctors');
     }
 }
 
 // Book appointment
-async function bookAppointment(doctorId) {
+async function bookAppointment(doctorId, time) {
     try {
         const date = document.querySelector('#appointment-date').value;
-        const timeSelect = document.querySelector(`select[data-doctor-id="${doctorId}"]`);
-        const time = timeSelect.value;
         const symptoms = document.querySelector('#symptoms').value;
 
         if (!date || !time || !symptoms) {
-            showNotification('Please fill in all required fields', 'error');
+            NotificationService.warning('Please fill in all required fields');
             return;
         }
 
@@ -140,42 +161,40 @@ async function bookAppointment(doctorId) {
         });
 
         if (response.ok) {
-            showNotification('Appointment booked successfully', 'success');
-            loadAppointments();
+            NotificationService.success('Appointment booked successfully');
             document.querySelector('#symptoms').value = '';
+            loadAppointments();
         } else {
             const error = await response.json();
-            showNotification(error.message, 'error');
+            NotificationService.error(error.message);
         }
     } catch (error) {
         console.error('Error booking appointment:', error);
-        showNotification('Error booking appointment', 'error');
+        NotificationService.error('Error booking appointment');
     }
 }
 
-// Cancel appointment
-async function cancelAppointment(appointmentId) {
+// Update appointment status
+async function updateAppointmentStatus(appointmentId, status) {
     try {
         const response = await fetch(`/appointments/${appointmentId}/status`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                status: 'cancelled'
-            })
+            body: JSON.stringify({ status })
         });
 
         if (response.ok) {
-            showNotification('Appointment cancelled successfully', 'success');
+            NotificationService.success(`Appointment ${status} successfully`);
             loadAppointments();
         } else {
             const error = await response.json();
-            showNotification(error.message, 'error');
+            NotificationService.error(error.message);
         }
     } catch (error) {
-        console.error('Error cancelling appointment:', error);
-        showNotification('Error cancelling appointment', 'error');
+        console.error('Error updating appointment status:', error);
+        NotificationService.error('Error updating appointment status');
     }
 }
 
@@ -189,116 +208,138 @@ async function loadProfile() {
         document.querySelector('input[name="name"]').value = user.name;
         document.querySelector('input[name="email"]').value = user.email;
         document.querySelector('input[name="phone"]').value = user.phone || '';
+        document.querySelector('select[name="bloodGroup"]').value = user.bloodGroup || '';
     } catch (error) {
         console.error('Error loading profile:', error);
-        showNotification('Error loading profile', 'error');
+        NotificationService.error('Error loading profile');
     }
 }
 
-// Update profile
-async function updateProfile(event) {
-    event.preventDefault();
-    
+// Load medical history
+async function loadMedicalHistory() {
     try {
-        const formData = new FormData(event.target);
-        const data = Object.fromEntries(formData.entries());
+        const response = await fetch('/profile/medical-history');
+        const history = await response.json();
+        
+        const historyContainer = document.querySelector('#medical-history');
+        if (!historyContainer) return;
 
-        const response = await fetch('/profile/update', {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
-
-        if (response.ok) {
-            showNotification('Profile updated successfully', 'success');
-        } else {
-            const error = await response.json();
-            showNotification(error.message, 'error');
+        if (history.length === 0) {
+            historyContainer.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-notes-medical text-4xl mb-4"></i>
+                    <p>No medical history available</p>
+                </div>
+            `;
+            return;
         }
+
+        historyContainer.innerHTML = history.map(record => `
+            <div class="border-l-4 border-blue-500 pl-4">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="font-semibold">${record.title}</p>
+                        <p class="text-sm text-gray-500">Dr. ${record.doctor.name} - ${record.doctor.specialization}</p>
+                    </div>
+                    <p class="text-sm text-gray-500">${new Date(record.date).toLocaleDateString()}</p>
+                </div>
+                <p class="mt-2 text-gray-600">${record.description}</p>
+            </div>
+        `).join('');
     } catch (error) {
-        console.error('Error updating profile:', error);
-        showNotification('Error updating profile', 'error');
+        console.error('Error loading medical history:', error);
+        NotificationService.error('Error loading medical history');
     }
 }
 
-// Helper functions
-function getStatusColor(status) {
-    const colors = {
-        pending: 'bg-yellow-100 text-yellow-800',
-        confirmed: 'bg-green-100 text-green-800',
-        cancelled: 'bg-red-100 text-red-800',
-        completed: 'bg-gray-100 text-gray-800'
-    };
-    return colors[status] || colors.pending;
+// Update dashboard stats
+function updateDashboardStats(appointments) {
+    if (!appointments) return;
+
+    const totalAppointments = appointments.length;
+    const upcomingAppointments = appointments.filter(a => 
+        [AppointmentStatus.REQUESTED, AppointmentStatus.CONFIRMED].includes(a.status)
+    ).length;
+    const completedVisits = appointments.filter(a => a.status === AppointmentStatus.COMPLETED).length;
+    const prescriptionsCount = appointments.filter(a => a.prescription).length;
+
+    document.getElementById('total-appointments').textContent = totalAppointments;
+    document.getElementById('upcoming-appointments').textContent = upcomingAppointments;
+    document.getElementById('completed-visits').textContent = completedVisits;
+    document.getElementById('prescriptions-count').textContent = prescriptionsCount;
 }
 
-function getAppointmentActions(appointment) {
-    if (appointment.status === 'pending' || appointment.status === 'confirmed') {
-        return `
-            <button onclick="cancelAppointment('${appointment._id}')"
-                    class="text-red-600 hover:text-red-900">
-                Cancel
-            </button>
-        `;
+// Generate star rating HTML
+function generateStarRating(rating) {
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
+    let stars = '';
+    
+    for (let i = 0; i < fullStars; i++) {
+        stars += '<i class="fas fa-star"></i>';
     }
-    return '';
-}
-
-function generateTimeSlots(bookedSlots) {
-    const slots = [];
-    for (let hour = 9; hour <= 17; hour++) {
-        const time = `${hour.toString().padStart(2, '0')}:00`;
-        if (!bookedSlots.includes(time)) {
-            slots.push(`<option value="${time}">${time}</option>`);
-        }
+    if (hasHalfStar) {
+        stars += '<i class="fas fa-star-half-alt"></i>';
     }
-    return slots.join('');
+    const emptyStars = 5 - Math.ceil(rating);
+    for (let i = 0; i < emptyStars; i++) {
+        stars += '<i class="far fa-star"></i>';
+    }
+    
+    return stars;
 }
 
+// Setup event listeners
 function setupEventListeners() {
     // Profile form submission
     const profileForm = document.querySelector('#profile-form');
     if (profileForm) {
-        profileForm.addEventListener('submit', updateProfile);
+        profileForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const formData = new FormData(e.target);
+                const response = await fetch('/profile/update', {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(Object.fromEntries(formData))
+                });
+
+                if (response.ok) {
+                    NotificationService.success('Profile updated successfully');
+                } else {
+                    const error = await response.json();
+                    NotificationService.error(error.message);
+                }
+            } catch (error) {
+                console.error('Error updating profile:', error);
+                NotificationService.error('Error updating profile');
+            }
+        });
     }
 
-    // Doctor search form submission
-    const searchForm = document.querySelector('#search-doctors-form');
-    if (searchForm) {
-        searchForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            loadDoctors();
+    // Quick action buttons
+    const newAppointmentBtn = document.querySelector('[data-action="new-appointment"]');
+    if (newAppointmentBtn) {
+        newAppointmentBtn.addEventListener('click', () => {
+            document.querySelector('#booking-section').scrollIntoView({ behavior: 'smooth' });
         });
     }
 }
 
-// Notification system
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = `fixed top-4 right-4 p-4 rounded-md ${
-        type === 'error' ? 'bg-red-500' : 'bg-green-500'
-    } text-white`;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    setTimeout(() => notification.remove(), 3000);
+// Initialize real-time updates
+function initializeRealTimeUpdates() {
+    SocketService.listenForAppointmentUpdates((data) => {
+        loadAppointments();
+        NotificationService.info(`Appointment ${data.status}: ${data.message}`);
+    });
+
+    SocketService.listenForNotifications((data) => {
+        NotificationService.info(data.message);
+    });
 }
 
-// Real-time notifications
-function startNotificationPolling() {
-    setInterval(async () => {
-        try {
-            const response = await fetch('/notifications');
-            const notifications = await response.json();
-            
-            const notificationCount = document.querySelector('#notification-count');
-            if (notificationCount) {
-                notificationCount.textContent = notifications.length;
-                notificationCount.classList.toggle('hidden', notifications.length === 0);
-            }
-        } catch (error) {
-            console.error('Error fetching notifications:', error);
-        }
-    }, 30000); // Poll every 30 seconds
-}
+// Export functions for global access
+window.bookAppointment = bookAppointment;
+window.updateAppointmentStatus = updateAppointmentStatus;
