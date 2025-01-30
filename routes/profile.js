@@ -1,161 +1,171 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
-const User = require('../models/User');
-const Review = require('../models/Review');
+const multer = require('multer');
+const path = require('path');
+const bcrypt = require('bcryptjs');
+const User = require('../models/user');
+
+// Configure multer for profile image uploads
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/profile-images');
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedTypes = ['image/jpeg', 'image/png'];
+        if (allowedTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Invalid file type. Only JPEG and PNG images are allowed.'));
+        }
+    }
+});
+
+// Middleware to check if user is authenticated
+const isAuthenticated = (req, res, next) => {
+    if (req.session.user) {
+        next();
+    } else {
+        res.redirect('/auth/login');
+    }
+};
+
+// Profile page
+router.get('/', isAuthenticated, (req, res) => {
+    res.render('profile', { user: req.session.user });
+});
 
 // Get user profile
-router.get('/', auth, async (req, res) => {
+router.get('/data', isAuthenticated, async (req, res) => {
     try {
-        const user = await User.findById(req.user._id).select('-password');
+        const user = await User.findById(req.session.user._id).select('-password');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
         res.json(user);
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error fetching profile:', error);
+        res.status(500).json({ message: 'Error fetching profile' });
     }
 });
 
-// Update user profile
-router.patch('/update', auth, async (req, res) => {
+// Update profile
+router.patch('/', isAuthenticated, async (req, res) => {
     try {
-        const updates = req.body;
-        const allowedUpdates = ['name', 'email', 'phone', 'specialization', 'department', 'consultationFee'];
-        const isValidOperation = Object.keys(updates).every(update => 
-            allowedUpdates.includes(update)
-        );
+        const updates = {};
+        const allowedUpdates = [
+            'name',
+            'phone',
+            'address',
+            'dateOfBirth',
+            'gender',
+            'bloodGroup',
+            'emergencyContact'
+        ];
 
-        if (!isValidOperation) {
-            return res.status(400).json({ message: 'Invalid updates' });
-        }
-
-        // Check if email is being updated and is unique
-        if (updates.email) {
-            const existingUser = await User.findOne({ 
-                email: updates.email,
-                _id: { $ne: req.user._id }
-            });
-            
-            if (existingUser) {
-                return res.status(400).json({ message: 'Email already in use' });
+        // Filter allowed updates
+        Object.keys(req.body).forEach(key => {
+            if (allowedUpdates.includes(key)) {
+                updates[key] = req.body[key];
             }
-        }
-
-        // Update user
-        Object.keys(updates).forEach(update => {
-            req.user[update] = updates[update];
         });
 
-        await req.user.save();
-        res.json(req.user);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Update profile image
-router.patch('/update-image', auth, async (req, res) => {
-    try {
-        const { profileImage } = req.body;
-        req.user.profileImage = profileImage;
-        await req.user.save();
-        res.json(req.user);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Get doctor's availability
-router.get('/availability', auth, async (req, res) => {
-    try {
-        if (req.user.role !== 'doctor') {
-            return res.status(403).json({ message: 'Not authorized' });
+        // Additional fields for doctors
+        if (req.session.user.role === 'doctor') {
+            if (req.body.specialization) updates.specialization = req.body.specialization;
+            if (req.body.qualifications) updates.qualifications = req.body.qualifications;
+            if (req.body.experience) updates.experience = req.body.experience;
+            if (req.body.consultationFee) updates.consultationFee = req.body.consultationFee;
         }
 
-        res.json(req.user.availability);
+        const user = await User.findByIdAndUpdate(
+            req.session.user._id,
+            { $set: updates },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Update session user data
+        req.session.user = {
+            ...req.session.user,
+            name: user.name
+        };
+
+        res.json({ message: 'Profile updated successfully', user });
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error updating profile:', error);
+        res.status(500).json({ message: 'Error updating profile' });
     }
 });
 
-// Update doctor's availability
-router.patch('/availability', auth, async (req, res) => {
+// Upload profile image
+router.post('/upload-image', isAuthenticated, upload.single('image'), async (req, res) => {
     try {
-        if (req.user.role !== 'doctor') {
-            return res.status(403).json({ message: 'Not authorized' });
+        if (!req.file) {
+            return res.status(400).json({ message: 'No image file provided' });
         }
 
-        const { availability } = req.body;
-        req.user.availability = availability;
-        await req.user.save();
-        res.json(req.user);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
+        const user = await User.findByIdAndUpdate(
+            req.session.user._id,
+            { $set: { profileImage: req.file.path } },
+            { new: true }
+        ).select('-password');
 
-// Get doctor's reviews
-router.get('/reviews', auth, async (req, res) => {
-    try {
-        if (req.user.role !== 'doctor') {
-            return res.status(403).json({ message: 'Not authorized' });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
         }
-
-        const reviews = await Review.find({ doctor: req.user._id })
-            .populate('patient', 'name profileImage')
-            .sort({ date: -1 })
-            .limit(10);
-
-        // Calculate average rating
-        const allReviews = await Review.find({ doctor: req.user._id });
-        const averageRating = allReviews.reduce((acc, review) => acc + review.rating, 0) / allReviews.length;
 
         res.json({
-            reviews,
-            averageRating,
-            totalReviews: allReviews.length
+            message: 'Profile image uploaded successfully',
+            imagePath: req.file.path
         });
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error uploading profile image:', error);
+        res.status(500).json({ message: 'Error uploading profile image' });
     }
 });
 
-// Submit a review
-router.post('/reviews', auth, async (req, res) => {
+// Change password
+router.post('/change-password', isAuthenticated, async (req, res) => {
     try {
-        if (req.user.role !== 'patient') {
-            return res.status(403).json({ message: 'Only patients can submit reviews' });
+        const { currentPassword, newPassword } = req.body;
+
+        const user = await User.findById(req.session.user._id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
         }
 
-        const { appointmentId, rating, comment } = req.body;
-
-        // Check if appointment exists and is completed
-        const appointment = await Appointment.findOne({
-            _id: appointmentId,
-            patient: req.user._id,
-            status: 'completed'
-        });
-
-        if (!appointment) {
-            return res.status(404).json({ message: 'Appointment not found or not completed' });
+        // Check current password
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(401).json({ message: 'Current password is incorrect' });
         }
 
-        // Check if review already exists
-        const existingReview = await Review.findOne({ appointment: appointmentId });
-        if (existingReview) {
-            return res.status(400).json({ message: 'Review already submitted for this appointment' });
-        }
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-        const review = new Review({
-            patient: req.user._id,
-            doctor: appointment.doctor,
-            appointment: appointmentId,
-            rating,
-            comment
-        });
+        // Update password
+        user.password = hashedPassword;
+        await user.save();
 
-        await review.save();
-        res.status(201).json(review);
+        res.json({ message: 'Password changed successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error changing password:', error);
+        res.status(500).json({ message: 'Error changing password' });
     }
 });
 

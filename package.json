@@ -1,25 +1,30 @@
 {
   "name": "doctor-appointment-system",
   "version": "1.0.0",
-  "description": "A modern doctor appointment system with authentication",
-  "main": "server.js",
+  "description": "A modern doctor appointment system",
+  "main": "app.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js"
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "jest"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
-    "cookie-parser": "^1.4.6",
-    "dotenv": "^16.3.1",
+    "connect-mongo": "^4.6.0",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.0.3",
+    "ejs": "^3.1.8",
     "express": "^4.18.2",
+    "express-session": "^1.18.1",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^7.5.0",
-    "ejs": "^3.1.9",
-    "tailwindcss": "^3.3.3",
-    "postcss": "^8.4.29",
-    "autoprefixer": "^10.4.15"
+    "mongoose": "^6.13.8",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.10.0",
+    "socket.io": "^4.5.4",
+    "validator": "^13.7.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "jest": "^29.3.1",
+    "nodemon": "^2.0.20"
   }
-} 
+}

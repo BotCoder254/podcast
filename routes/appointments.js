@@ -1,152 +1,87 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
-const Appointment = require('../models/Appointment');
-const User = require('../models/User');
 
-// Get all appointments for the logged-in patient
-router.get('/my-appointments', auth, async (req, res) => {
-    try {
-        const appointments = await Appointment.find({ patient: req.user._id })
-            .populate('doctor', 'name specialization')
-            .sort({ date: 1 });
-        res.json(appointments);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+// Middleware to check if user is authenticated
+const isAuthenticated = (req, res, next) => {
+    if (req.session.user) {
+        next();
+    } else {
+        res.redirect('/auth/login');
     }
+};
+
+// List appointments page
+router.get('/', isAuthenticated, (req, res) => {
+    res.render('appointments', { user: req.session.user });
 });
 
-// Get doctor's appointments for today
-router.get('/doctor-appointments', auth, async (req, res) => {
-    try {
-        if (req.user.role !== 'doctor') {
-            return res.status(403).json({ message: 'Not authorized' });
-        }
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        const appointments = await Appointment.find({
-            doctor: req.user._id,
-            date: {
-                $gte: today,
-                $lt: tomorrow
-            }
-        }).populate('patient', 'name email profileImage');
-
-        res.json(appointments);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
+// New appointment page
+router.get('/new', isAuthenticated, (req, res) => {
+    res.render('new-appointment', { user: req.session.user });
 });
 
-// Get doctor's patients
-router.get('/doctor-patients', auth, async (req, res) => {
+// Get appointments list
+router.get('/list', isAuthenticated, async (req, res) => {
     try {
-        if (req.user.role !== 'doctor') {
-            return res.status(403).json({ message: 'Not authorized' });
-        }
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
 
-        const appointments = await Appointment.find({
-            doctor: req.user._id,
-            status: 'completed'
-        }).populate('patient', 'name email profileImage');
-
-        // Get unique patients with their last visit and total visits
-        const patientMap = new Map();
-        appointments.forEach(appointment => {
-            const patient = appointment.patient;
-            const existingPatient = patientMap.get(patient._id.toString());
-            
-            if (!existingPatient || new Date(appointment.date) > new Date(existingPatient.lastVisit)) {
-                patientMap.set(patient._id.toString(), {
-                    ...patient.toObject(),
-                    lastVisit: appointment.date,
-                    totalVisits: (existingPatient?.totalVisits || 0) + 1
-                });
-            } else {
-                patientMap.get(patient._id.toString()).totalVisits++;
-            }
-        });
-
-        res.json(Array.from(patientMap.values()));
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Get available doctors by specialization and date
-router.get('/available-doctors', auth, async (req, res) => {
-    try {
-        const { specialization, date } = req.query;
-        const query = { role: 'doctor' };
+        const query = { patientId: req.session.user._id };
         
-        if (specialization) {
-            query.specialization = specialization;
-        }
+        // Apply filters
+        if (req.query.status) query.status = req.query.status;
+        if (req.query.dateFrom) query.date = { $gte: new Date(req.query.dateFrom) };
+        if (req.query.dateTo) query.date = { ...query.date, $lte: new Date(req.query.dateTo) };
 
-        const doctors = await User.find(query).select('-password');
-        
-        // Get booked appointments for the date
-        const bookedAppointments = await Appointment.find({
-            date: new Date(date),
-            status: { $ne: 'cancelled' }
-        });
+        const appointments = await Appointment.find(query)
+            .populate('doctorId', 'name specialization profileImage')
+            .sort({ date: -1, time: -1 })
+            .skip(skip)
+            .limit(limit);
 
-        // Filter out unavailable time slots
-        const availableDoctors = doctors.map(doctor => {
-            const doctorAppointments = bookedAppointments.filter(
-                app => app.doctor.toString() === doctor._id.toString()
-            );
-            
-            return {
-                ...doctor.toObject(),
-                bookedSlots: doctorAppointments.map(app => app.time)
-            };
-        });
+        const total = await Appointment.countDocuments(query);
+        const totalPages = Math.ceil(total / limit);
 
-        res.json(availableDoctors);
+        res.json({ appointments, total, totalPages });
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error fetching appointments:', error);
+        res.status(500).json({ message: 'Error fetching appointments' });
     }
 });
 
-// Book a new appointment
-router.post('/book', auth, async (req, res) => {
+// Book appointment
+router.post('/book', isAuthenticated, async (req, res) => {
     try {
-        const { doctorId, date, time, symptoms } = req.body;
+        const { doctorId, date, time, symptoms, notes } = req.body;
+        const patientId = req.session.user._id;
 
-        // Check if the slot is available
-        const existingAppointment = await Appointment.findOne({
-            doctor: doctorId,
-            date,
-            time,
-            status: { $ne: 'cancelled' }
-        });
-
-        if (existingAppointment) {
-            return res.status(400).json({ message: 'This slot is already booked' });
+        // Check if slot is available
+        const isAvailable = await checkSlotAvailability(doctorId, date, time);
+        if (!isAvailable) {
+            return res.status(400).json({ message: 'This time slot is no longer available' });
         }
 
         const appointment = new Appointment({
-            patient: req.user._id,
-            doctor: doctorId,
+            doctorId,
+            patientId,
             date,
             time,
-            symptoms
+            symptoms,
+            notes,
+            status: 'requested'
         });
 
         await appointment.save();
         res.status(201).json(appointment);
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error booking appointment:', error);
+        res.status(500).json({ message: 'Error booking appointment' });
     }
 });
 
 // Update appointment status
-router.patch('/:id/status', auth, async (req, res) => {
+router.patch('/:id/status', isAuthenticated, async (req, res) => {
     try {
         const { status } = req.body;
         const appointment = await Appointment.findById(req.params.id);
@@ -155,83 +90,65 @@ router.patch('/:id/status', auth, async (req, res) => {
             return res.status(404).json({ message: 'Appointment not found' });
         }
 
-        // Check authorization
-        if (req.user.role === 'patient' && appointment.patient.toString() !== req.user._id.toString()) {
+        // Check permissions
+        if (req.session.user.role === 'patient' && 
+            appointment.patientId.toString() !== req.session.user._id.toString()) {
             return res.status(403).json({ message: 'Not authorized' });
-        }
-
-        if (req.user.role === 'doctor' && appointment.doctor.toString() !== req.user._id.toString()) {
-            return res.status(403).json({ message: 'Not authorized' });
-        }
-
-        // Validate status changes
-        const validStatusChanges = {
-            patient: ['cancelled'],
-            doctor: ['confirmed', 'cancelled', 'completed']
-        };
-
-        if (!validStatusChanges[req.user.role].includes(status)) {
-            return res.status(400).json({ message: 'Invalid status change' });
         }
 
         appointment.status = status;
         await appointment.save();
+
         res.json(appointment);
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error updating appointment status:', error);
+        res.status(500).json({ message: 'Error updating appointment status' });
     }
 });
 
-// Reschedule appointment
-router.patch('/:id/reschedule', auth, async (req, res) => {
+// Cancel appointment
+router.delete('/:id', isAuthenticated, async (req, res) => {
     try {
-        const { date, time } = req.body;
         const appointment = await Appointment.findById(req.params.id);
 
         if (!appointment) {
             return res.status(404).json({ message: 'Appointment not found' });
         }
 
-        // Check if new slot is available
-        const existingAppointment = await Appointment.findOne({
-            doctor: appointment.doctor,
-            date,
-            time,
-            status: { $ne: 'cancelled' },
-            _id: { $ne: appointment._id }
-        });
-
-        if (existingAppointment) {
-            return res.status(400).json({ message: 'This slot is already booked' });
-        }
-
-        appointment.date = date;
-        appointment.time = time;
-        appointment.status = 'pending'; // Reset status when rescheduled
-        await appointment.save();
-        res.json(appointment);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Get patient history
-router.get('/patient-history/:patientId', auth, async (req, res) => {
-    try {
-        if (req.user.role !== 'doctor') {
+        // Check permissions
+        if (appointment.patientId.toString() !== req.session.user._id.toString()) {
             return res.status(403).json({ message: 'Not authorized' });
         }
 
-        const appointments = await Appointment.find({
-            doctor: req.user._id,
-            patient: req.params.patientId,
-            status: 'completed'
-        }).sort({ date: -1 });
-
-        res.json(appointments);
+        await appointment.remove();
+        res.json({ message: 'Appointment cancelled successfully' });
     } catch (error) {
-        res.status(500).json({ message: 'Server error' });
+        console.error('Error cancelling appointment:', error);
+        res.status(500).json({ message: 'Error cancelling appointment' });
     }
 });
 
-module.exports = router; 
+// Check slot availability
+router.get('/check-availability', isAuthenticated, async (req, res) => {
+    try {
+        const { doctorId, date, time } = req.query;
+        const available = await checkSlotAvailability(doctorId, date, time);
+        res.json({ available });
+    } catch (error) {
+        console.error('Error checking availability:', error);
+        res.status(500).json({ message: 'Error checking availability' });
+    }
+});
+
+// Helper function to check slot availability
+async function checkSlotAvailability(doctorId, date, time) {
+    const existingAppointment = await Appointment.findOne({
+        doctorId,
+        date,
+        time,
+        status: { $nin: ['cancelled'] }
+    });
+    return !existingAppointment;
+}
+
+module.exports = router;

@@ -1,0 +1,131 @@
+<%- include('partials/header') %>
+
+<div class="container mx-auto px-4 py-8">
+    <!-- Page Header -->
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-gray-800">Profile Settings</h1>
+        <p class="text-gray-600 mt-1">Manage your account settings and preferences</p>
+    </div>
+
+    <!-- Profile Form -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <form id="profile-form" class="space-y-6">
+            <!-- Profile Image -->
+            <div class="flex items-center">
+                <div class="relative">
+                    <img src="<%= user.profileImage || '/images/default-avatar.png' %>" 
+                         alt="Profile" 
+                         class="h-20 w-20 rounded-full object-cover">
+                    <label for="profile-image" 
+                           class="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full p-2 cursor-pointer hover:bg-blue-700 transition duration-150">
+                        <i class="fas fa-camera"></i>
+                        <input type="file" id="profile-image" class="hidden" accept="image/*">
+                    </label>
+                </div>
+                <div class="ml-4">
+                    <h3 class="font-semibold text-gray-800"><%= user.name %></h3>
+                    <p class="text-sm text-gray-500">Click the camera icon to update your profile picture</p>
+                </div>
+            </div>
+
+            <!-- Personal Information -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                    <input type="text" name="name" value="<%= user.name %>" 
+                           class="w-full rounded-lg border-gray-300">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" name="email" value="<%= user.email %>" 
+                           class="w-full rounded-lg border-gray-300" readonly>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                    <input type="tel" name="phone" value="<%= user.phone %>" 
+                           class="w-full rounded-lg border-gray-300">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+                    <input type="date" name="dateOfBirth" value="<%= user.dateOfBirth %>" 
+                           class="w-full rounded-lg border-gray-300">
+                </div>
+            </div>
+
+            <!-- Medical Information -->
+            <div class="border-t pt-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Medical Information</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Blood Group</label>
+                        <select name="bloodGroup" class="w-full rounded-lg border-gray-300">
+                            <option value="">Select Blood Group</option>
+                            <option value="A+" <%= user.bloodGroup === 'A+' ? 'selected' : '' %>>A+</option>
+                            <option value="A-" <%= user.bloodGroup === 'A-' ? 'selected' : '' %>>A-</option>
+                            <option value="B+" <%= user.bloodGroup === 'B+' ? 'selected' : '' %>>B+</option>
+                            <option value="B-" <%= user.bloodGroup === 'B-' ? 'selected' : '' %>>B-</option>
+                            <option value="AB+" <%= user.bloodGroup === 'AB+' ? 'selected' : '' %>>AB+</option>
+                            <option value="AB-" <%= user.bloodGroup === 'AB-' ? 'selected' : '' %>>AB-</option>
+                            <option value="O+" <%= user.bloodGroup === 'O+' ? 'selected' : '' %>>O+</option>
+                            <option value="O-" <%= user.bloodGroup === 'O-' ? 'selected' : '' %>>O-</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Height (cm)</label>
+                        <input type="number" name="height" value="<%= user.height %>" 
+                               class="w-full rounded-lg border-gray-300">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
+                        <input type="number" name="weight" value="<%= user.weight %>" 
+                               class="w-full rounded-lg border-gray-300">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Allergies</label>
+                        <input type="text" name="allergies" value="<%= user.allergies %>" 
+                               placeholder="Separate with commas"
+                               class="w-full rounded-lg border-gray-300">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Contact -->
+            <div class="border-t pt-6">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Emergency Contact</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+                        <input type="text" name="emergencyContact.name" 
+                               value="<%= user.emergencyContact?.name %>" 
+                               class="w-full rounded-lg border-gray-300">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Relationship</label>
+                        <input type="text" name="emergencyContact.relationship" 
+                               value="<%= user.emergencyContact?.relationship %>" 
+                               class="w-full rounded-lg border-gray-300">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                        <input type="tel" name="emergencyContact.phone" 
+                               value="<%= user.emergencyContact?.phone %>" 
+                               class="w-full rounded-lg border-gray-300">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="flex justify-end">
+                <button type="submit"
+                        class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition duration-150">
+                    Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="/js/profile.js" type="module"></script>
+
+<%- include('partials/footer') %> 

@@ -142,8 +142,16 @@ async function bookAppointment(doctorId, time) {
         const date = document.querySelector('#appointment-date').value;
         const symptoms = document.querySelector('#symptoms').value;
 
-        if (!date || !time || !symptoms) {
-            NotificationService.warning('Please fill in all required fields');
+        // Validate inputs
+        if (!validateAppointmentInputs(date, time, symptoms)) {
+            return;
+        }
+
+        // Check if slot is still available
+        const isAvailable = await checkSlotAvailability(doctorId, date, time);
+        if (!isAvailable) {
+            NotificationService.warning('This time slot is no longer available. Please choose another time.');
+            loadDoctors(); // Refresh available slots
             return;
         }
 
@@ -164,6 +172,13 @@ async function bookAppointment(doctorId, time) {
             NotificationService.success('Appointment booked successfully');
             document.querySelector('#symptoms').value = '';
             loadAppointments();
+            // Emit socket event for real-time update
+            SocketService.requestAppointment({
+                doctorId,
+                date,
+                time,
+                symptoms
+            });
         } else {
             const error = await response.json();
             NotificationService.error(error.message);
@@ -171,6 +186,35 @@ async function bookAppointment(doctorId, time) {
     } catch (error) {
         console.error('Error booking appointment:', error);
         NotificationService.error('Error booking appointment');
+    }
+}
+
+// Validate appointment inputs
+function validateAppointmentInputs(date, time, symptoms) {
+    if (!date) {
+        NotificationService.warning('Please select a date');
+        return false;
+    }
+    if (!time) {
+        NotificationService.warning('Please select a time slot');
+        return false;
+    }
+    if (!symptoms || symptoms.trim().length < 10) {
+        NotificationService.warning('Please describe your symptoms (minimum 10 characters)');
+        return false;
+    }
+    return true;
+}
+
+// Check slot availability in real-time
+async function checkSlotAvailability(doctorId, date, time) {
+    try {
+        const response = await fetch(`/appointments/check-availability?doctorId=${doctorId}&date=${date}&time=${time}`);
+        const { available } = await response.json();
+        return available;
+    } catch (error) {
+        console.error('Error checking slot availability:', error);
+        return false;
     }
 }
 

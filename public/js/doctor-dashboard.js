@@ -279,11 +279,27 @@ async function setAvailability(event) {
     
     try {
         const formData = new FormData(event.target);
+        const day = formData.get('day');
+        const startTime = formData.get('startTime');
+        const endTime = formData.get('endTime');
+
+        // Validate time inputs
+        if (!validateTimeInputs(startTime, endTime)) {
+            return;
+        }
+
+        // Check for schedule conflicts
+        const hasConflict = await checkScheduleConflicts(day, startTime, endTime);
+        if (hasConflict) {
+            NotificationService.warning('This time slot conflicts with existing appointments. Please choose different hours.');
+            return;
+        }
+
         const data = {
-            day: formData.get('day'),
+            day,
             slots: [{
-                startTime: formData.get('startTime'),
-                endTime: formData.get('endTime')
+                startTime,
+                endTime
             }]
         };
 
@@ -299,7 +315,8 @@ async function setAvailability(event) {
             NotificationService.success('Availability updated successfully');
             closeAvailabilityModal();
             loadSchedule();
-            SocketService.emit('availabilityUpdated', data);
+            // Emit socket event for real-time update
+            SocketService.updateDoctorAvailability(data);
         } else {
             const error = await response.json();
             NotificationService.error(error.message);
@@ -307,6 +324,43 @@ async function setAvailability(event) {
     } catch (error) {
         console.error('Error setting availability:', error);
         NotificationService.error('Error setting availability');
+    }
+}
+
+// Validate time inputs
+function validateTimeInputs(startTime, endTime) {
+    if (!startTime || !endTime) {
+        NotificationService.warning('Please select both start and end time');
+        return false;
+    }
+
+    const start = new Date(`2000-01-01T${startTime}`);
+    const end = new Date(`2000-01-01T${endTime}`);
+
+    if (start >= end) {
+        NotificationService.warning('End time must be after start time');
+        return false;
+    }
+
+    const minDuration = 30; // minutes
+    const duration = (end - start) / (1000 * 60); // convert to minutes
+    if (duration < minDuration) {
+        NotificationService.warning(`Time slot must be at least ${minDuration} minutes long`);
+        return false;
+    }
+
+    return true;
+}
+
+// Check for schedule conflicts
+async function checkScheduleConflicts(day, startTime, endTime) {
+    try {
+        const response = await fetch(`/appointments/check-conflicts?day=${day}&startTime=${startTime}&endTime=${endTime}`);
+        const { hasConflict } = await response.json();
+        return hasConflict;
+    } catch (error) {
+        console.error('Error checking schedule conflicts:', error);
+        return true; // Assume conflict on error to prevent scheduling issues
     }
 }
 

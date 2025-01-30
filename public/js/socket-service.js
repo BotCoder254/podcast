@@ -1,7 +1,43 @@
 // WebSocket connection
-const socket = io();
+const socket = io({
+    reconnection: true,
+    reconnectionAttempts: 5,
+    reconnectionDelay: 1000
+});
 
 const SocketService = {
+    isConnected: false,
+    connectionListeners: new Set(),
+
+    // Connection status
+    onConnect(callback) {
+        socket.on('connect', () => {
+            this.isConnected = true;
+            this.notifyConnectionListeners();
+            callback?.();
+        });
+    },
+
+    onDisconnect(callback) {
+        socket.on('disconnect', () => {
+            this.isConnected = false;
+            this.notifyConnectionListeners();
+            callback?.();
+        });
+    },
+
+    addConnectionListener(callback) {
+        this.connectionListeners.add(callback);
+    },
+
+    removeConnectionListener(callback) {
+        this.connectionListeners.delete(callback);
+    },
+
+    notifyConnectionListeners() {
+        this.connectionListeners.forEach(callback => callback(this.isConnected));
+    },
+
     // Listen for appointment updates
     listenForAppointmentUpdates(callback) {
         socket.on('appointmentUpdate', (data) => {
